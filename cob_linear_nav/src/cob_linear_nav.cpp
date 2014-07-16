@@ -235,6 +235,7 @@ class NodeClass
 					getRobotPoseGlobal();
 					start_x = robot_pose_global_.pose.position.x;
 					start_y = robot_pose_global_.pose.position.y;
+		
           last_time_moving_ = ros::Time::now().toSec();
 					move_ = true;
 				} else {
@@ -273,16 +274,15 @@ class NodeClass
 				
 				double dx = aim_x-x, dy = aim_y-y;
 				const double lr = std::sqrt(dx*dx + dy*dy);
-				const double l  = std::min(foresight_max_, lr);
 				
-				if(lr>0) {
-					dx = dx*l/lr;
-					dy = dy*l/lr;
+				if(lr>foresight_max_) {
+					dx = dx*foresight_max_/lr;
+					dy = dy*foresight_max_/lr;
+				
+					goal_pose_global_.pose.position.x = x+dx;
+					goal_pose_global_.pose.position.y = y+dy;
 				} else
-					dx=dy=0;
-				
-				goal_pose_global_.pose.position.x = x+dx;
-				goal_pose_global_.pose.position.y = y+dy;
+					goal_pose_global_.pose.position = goal_pose.pose.position;
 				
 			}
 			
