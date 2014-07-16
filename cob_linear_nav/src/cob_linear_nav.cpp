@@ -245,14 +245,13 @@ class NodeClass
 				}
 			}
 			
+			//get actual pose
+			getRobotPoseGlobal();
+			
 			//interpolate next intermediate goal (only translation)
 			if(foresight_max_<=0)
 				goal_pose_global_ = goal_pose;
-			else {
-				pthread_mutex_lock(&m_mutex);
-				
-				//get actual pose
-				getRobotPoseGlobal();
+			else {				
 				
 				//keep everything except for translation (x,y)
 				goal_pose_global_.header = goal_pose.header;
@@ -260,14 +259,14 @@ class NodeClass
 				
 				const double aim_x = goal_pose.pose.position.x;
 				const double aim_y = goal_pose.pose.position.y;
-				const double xx = robot_pose_global_.pose.position.x;
-				const double yy = robot_pose_global_.pose.position.y;
+				const double xx = robot_pose_global_.pose.position.x-start_x;
+				const double yy = robot_pose_global_.pose.position.y-start_y;
 				
 				//correct x and y (projection on line)
 				const double sax = aim_x-start_x;
 				const double say = aim_y-start_y;
-				const double x = (xx*sax + yy*say)/(sax*sax + say*say) * sax;
-				const double y = (xx*sax + yy*say)/(sax*sax + say*say) * say;
+				const double x = (xx*sax + yy*say)/(sax*sax + say*say) * sax + start_x;
+				const double y = (xx*sax + yy*say)/(sax*sax + say*say) * say + start_y;
 				
 				double dx = aim_x-x, dy = aim_y-y;
 				const double lr = std::sqrt(dx*dx + dy*dy);
@@ -282,7 +281,6 @@ class NodeClass
 				goal_pose_global_.pose.position.x = x+dx;
 				goal_pose_global_.pose.position.y = y+dy;
 				
-				pthread_mutex_unlock(&m_mutex);
 			}
 			
 			performControllerStep();
