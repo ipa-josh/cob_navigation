@@ -148,6 +148,9 @@ class NodeClass
 		if(!private_nh.hasParam("vtheta_max")) ROS_WARN("Used default parameter for vtheta_max [0.3 rad/s]");
 		private_nh.param("vtheta_max", vtheta_max_, 0.3);
 		
+		if(!private_nh.hasParam("foresight_max")) ROS_WARN("Used default parameter for foresight_max [-1 m]");
+		private_nh.param("foresight_max", foresight_max_, -1.);
+		
 		if(!private_nh.hasParam("goal_threshold_rot")) ROS_WARN("Used default parameter for goal_threshold_rot [0.08 rad]");
 		private_nh.param("goal_threshold_rot", goal_threshold_rot_, 0.08);
 		
@@ -214,7 +217,7 @@ class NodeClass
 		vy_last_ = 0.0f;
 		last_time_ = ros::Time::now().toSec();
 		
-		goal_pose_global_ = transformGoalToMap(goal->target_pose);
+		geometry_msgs::PoseStamped goal_pose = transformGoalToMap(goal->target_pose);
 		
 		move_ = true;
 		
@@ -227,7 +230,7 @@ class NodeClass
 					ROS_INFO("New goal received, updating movement");
 					//if we're active and a new goal is available, we'll accept it
 					move_base_msgs::MoveBaseGoal new_goal = * as_.acceptNewGoal();
-					goal_pose_global_ = transformGoalToMap(new_goal.target_pose);
+					goal_pose = transformGoalToMap(new_goal.target_pose);
 
           last_time_moving_ = ros::Time::now().toSec();
 					move_ = true;
@@ -240,6 +243,37 @@ class NodeClass
 					stopMovement();
 					return;
 				}
+			}
+			
+			//interpolate next intermediate goal (only translation)
+			if(foresight_max_<=0)
+				goal_pose_global_ = goal_pose;
+			else {
+				pthread_mutex_lock(&m_mutex);
+				
+				//get actual pose
+				getRobotPoseGlobal();
+				
+				//keep everything except for translation (x,y)
+				goal_pose_global_.header = goal_pose.header;
+				goal_pose_global_.pose.orientation = goal_pose.pose.orientation;
+				
+				const double aim_x = goal_pose_global_.pose.position.x;
+				const double aim_y = goal_pose_global_.pose.position.y;
+				const double x = robot_pose_global_.pose.position.x;
+				const double y = robot_pose_global_.pose.position.y;
+				
+				double dx = aim_x-x, dy = aim_y-y;
+				const double lr = std::sqrt(dx*dx + dy*dy);
+				const double l  = std::min(foresight_max_, lr);
+				
+				dx = dx*l/lr;
+				dy = dy*l/lr;
+				
+				goal_pose_global_.pose.position.x = x+dx;
+				goal_pose_global_.pose.position.y = y+dy;
+				
+				pthread_mutex_unlock(&m_mutex);
 			}
 			
 			performControllerStep();
@@ -317,6 +351,7 @@ class NodeClass
 	double kp_rot_, kv_rot_, virt_mass_rot_;
 	double last_time_;
 	double v_max_, vtheta_max_;
+	double foresight_max_;
   double last_time_moving_;
 
 }; //NodeClass
@@ -428,8 +463,6 @@ void NodeClass::performControllerStep() {
 		pthread_mutex_unlock(&m_mutex);
 		return;
 	}
-	
-	getRobotPoseGlobal();
 
   distance_to_goal = getDistance2d(robot_pose_global_, goal_pose_global_);
 	theta = tf::getYaw(robot_pose_global_.pose.orientation);
