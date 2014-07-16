@@ -209,8 +209,8 @@ class NodeClass
     last_time_moving_ = ros::Time::now().toSec();
 
     getRobotPoseGlobal();
-		x_last_ = robot_pose_global_.pose.position.x;
-		y_last_ = robot_pose_global_.pose.position.y;
+		const double start_x = x_last_ = robot_pose_global_.pose.position.x;
+		const double start_y = y_last_ = robot_pose_global_.pose.position.y;
 		theta_last_ = tf::getYaw(robot_pose_global_.pose.orientation);
 		vtheta_last_ = 0.0f;
 		vx_last_ = 0.0f;
@@ -258,17 +258,26 @@ class NodeClass
 				goal_pose_global_.header = goal_pose.header;
 				goal_pose_global_.pose.orientation = goal_pose.pose.orientation;
 				
-				const double aim_x = goal_pose_global_.pose.position.x;
-				const double aim_y = goal_pose_global_.pose.position.y;
-				const double x = robot_pose_global_.pose.position.x;
-				const double y = robot_pose_global_.pose.position.y;
+				const double aim_x = goal_pose.pose.position.x;
+				const double aim_y = goal_pose.pose.position.y;
+				const double xx = robot_pose_global_.pose.position.x;
+				const double yy = robot_pose_global_.pose.position.y;
+				
+				//correct x and y (projection on line)
+				const double sax = aim_x-start_x;
+				const double say = aim_y-start_y;
+				const double x = (xx*sax + yy*say)/(sax*sax + say*say) * sax;
+				const double y = (xx*sax + yy*say)/(sax*sax + say*say) * say;
 				
 				double dx = aim_x-x, dy = aim_y-y;
 				const double lr = std::sqrt(dx*dx + dy*dy);
 				const double l  = std::min(foresight_max_, lr);
 				
-				dx = dx*l/lr;
-				dy = dy*l/lr;
+				if(lr>0) {
+					dx = dx*l/lr;
+					dy = dy*l/lr;
+				} else
+					dx=dy=0;
 				
 				goal_pose_global_.pose.position.x = x+dx;
 				goal_pose_global_.pose.position.y = y+dy;
