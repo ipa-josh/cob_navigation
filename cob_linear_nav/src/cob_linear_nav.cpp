@@ -209,8 +209,8 @@ class NodeClass
     last_time_moving_ = ros::Time::now().toSec();
 
     getRobotPoseGlobal();
-		const double start_x = x_last_ = robot_pose_global_.pose.position.x;
-		const double start_y = y_last_ = robot_pose_global_.pose.position.y;
+		double start_x = x_last_ = robot_pose_global_.pose.position.x;
+		double start_y = y_last_ = robot_pose_global_.pose.position.y;
 		theta_last_ = tf::getYaw(robot_pose_global_.pose.orientation);
 		vtheta_last_ = 0.0f;
 		vx_last_ = 0.0f;
@@ -232,6 +232,9 @@ class NodeClass
 					move_base_msgs::MoveBaseGoal new_goal = * as_.acceptNewGoal();
 					goal_pose = transformGoalToMap(new_goal.target_pose);
 
+					getRobotPoseGlobal();
+					start_x = robot_pose_global_.pose.position.x;
+					start_y = robot_pose_global_.pose.position.y;
           last_time_moving_ = ros::Time::now().toSec();
 					move_ = true;
 				} else {
